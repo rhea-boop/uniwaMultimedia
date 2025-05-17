@@ -121,7 +121,7 @@ public class PrimaryController {
 
             // 3️⃣ Start a fixed-duration download (5 000 ms)
             // “Download for max 5 000 ms from that URL”
-            speedTestSocket.startFixedDownload("http://speedtest.tele2.net/5MB.zip", 10000);
+            speedTestSocket.startFixedDownload("http://speedtest.tele2.net/5MB.zip", 5000);
 
 
         } catch (Exception e) {

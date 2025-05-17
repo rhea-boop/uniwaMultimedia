@@ -3,6 +3,8 @@ package uniwa.media.server;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.IO;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
@@ -20,6 +22,12 @@ public class ClientHandler implements Runnable {
     public ClientHandler(Socket socket) {
         this.clientSocket = socket;
     }
+
+    private static final Map<String,Integer> STREAM_PORTS = Map.of(
+    "TCP",    5000,
+    "UDP",    5001,
+    "RTP/UDP",5002
+    );
 
     @Override
     public void run() {
@@ -76,6 +84,51 @@ public class ClientHandler implements Runnable {
                     System.out.println("Sending video list: " + response);
                     out.println("VIDEO_LIST " + response);
 
+                } 
+                
+                else if (inputLine.startsWith("PLAY")) {
+                    String[] request = inputLine.split("\\s+");
+                    if (request.length == 3) {
+                        String fileName = request[1];
+                        String protocol = request[2];
+                        Integer port = STREAM_PORTS.get(protocol);
+                        String clientIP = clientSocket.getInetAddress().getHostAddress();
+                        
+                        List<String> cmd = new ArrayList<>();
+                        cmd.add("ffmpeg");
+                        cmd.add("-re");
+                        cmd.add("-i");
+                        cmd.add("videos/" + fileName);
+                        cmd.add("-codec");
+                        cmd.add("copy");
+                        cmd.add("-f");
+                        switch (protocol) {
+                            case "TCP" : 
+                                cmd.add("mpegts");
+                                cmd.add("tcp://" + clientIP + ":" + port);
+                                break;
+                            
+                            case "UDP" :  
+                                cmd.add("mpegts");
+                                cmd.add("udp://" + clientIP + ":" + port);
+                                break;
+
+                            default: 
+                                cmd.add("rtp");
+                                cmd.add("rtp://" + clientIP + ":" + port);
+                                break;
+                        }
+
+                        try {
+                            new ProcessBuilder(cmd)
+                            .inheritIO()
+                            .redirectErrorStream(true)
+                            .start();
+                            out.println("Started playing");
+                        } catch (IOException e) { 
+                            out.println("Error starting ffmpeg: " + e.getMessage());
+                        }
+                    }
                 } else if (inputLine.startsWith("QUIT")) {
                     break;
                 } else {
