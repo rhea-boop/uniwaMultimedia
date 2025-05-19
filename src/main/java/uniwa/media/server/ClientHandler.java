@@ -96,27 +96,40 @@ public class ClientHandler implements Runnable {
                         
                         List<String> cmd = new ArrayList<>();
                         cmd.add("ffmpeg");
-                        cmd.add("-re");
-                        cmd.add("-i");
-                        cmd.add("videos/" + fileName);
-                        cmd.add("-codec");
-                        cmd.add("copy");
+                        cmd.add("-re");                        // real-time pacing
+                        cmd.add("-i"); cmd.add("videos/" + fileName);
+
+
+                        cmd.add("-c:v"); cmd.add("copy"); // copy video stream
+                        cmd.add("-c:a"); cmd.add("aac");  // re-encode audio to AAC
+                        cmd.add("-ac");  cmd.add("2");    // stereo audio
+                        cmd.add("-b:a"); cmd.add("96k");  // audio bitrate
+                        // Low-latency output
+                        cmd.add("-fflags");       cmd.add("+nobuffer");
+                        cmd.add("-flush_packets");cmd.add("1");
+                        cmd.add("-muxdelay");     cmd.add("0.001");
+                        cmd.add("-muxpreload");   cmd.add("0.001");
+
+
+                        // Ultrafast & zero-latency tuning (helps even for copy)
+                        cmd.add("-preset");  cmd.add("ultrafast");
+                        cmd.add("-tune");    cmd.add("zerolatency");
+
+                        // Choose container/muxer + URL
                         cmd.add("-f");
                         switch (protocol) {
-                            case "TCP" : 
-                                cmd.add("mpegts");
-                                cmd.add("tcp://" + clientIP + ":" + port);
-                                break;
-                            
-                            case "UDP" :  
-                                cmd.add("mpegts");
-                                cmd.add("udp://" + clientIP + ":" + port);
-                                break;
-
-                            default: 
-                                cmd.add("rtp");
-                                cmd.add("rtp://" + clientIP + ":" + port);
-                                break;
+                        case "TCP":
+                            cmd.add("mpegts");
+                            cmd.add("tcp://"  + clientIP + ":" + port);
+                            break;
+                        case "UDP":
+                            cmd.add("mpegts");
+                            cmd.add("udp://"  + clientIP + ":" + port);
+                            break;
+                        default: // RTP/UDP via MPEG-TS
+                            cmd.add("rtp_mpegts");
+                            cmd.add("rtp://"  + clientIP + ":" + port);
+                            break;
                         }
 
                         try {
@@ -124,7 +137,7 @@ public class ClientHandler implements Runnable {
                             .inheritIO()
                             .redirectErrorStream(true)
                             .start();
-                            out.println("Started playing");
+                            out.println("OK : Started playing");
                         } catch (IOException e) { 
                             out.println("Error starting ffmpeg: " + e.getMessage());
                         }
