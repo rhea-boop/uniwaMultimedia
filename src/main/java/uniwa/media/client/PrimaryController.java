@@ -40,7 +40,6 @@ public class PrimaryController {
     
     @FXML
     public void initialize() {
-        // Populate formats once
         formatChoice.getItems().addAll("mp4", "mkv", "avi");
         formatChoice.setValue("mp4");
     }
@@ -92,10 +91,7 @@ public class PrimaryController {
         speedLabel.setText("Speed: measuring…");
 
         try {
-            // 1️⃣ Create the speed-test socket
             SpeedTestSocket speedTestSocket = new SpeedTestSocket();
-
-            // 2️⃣ Add a listener implementing the correct callbacks
             speedTestSocket.addSpeedTestListener(new ISpeedTestListener() {
                 @Override
                 public void onCompletion(SpeedTestReport report) {
@@ -119,8 +115,6 @@ public class PrimaryController {
                 }
             });
 
-            // 3️⃣ Start a fixed-duration download (5 000 ms)
-            // “Download for max 5 000 ms from that URL”
             speedTestSocket.startFixedDownload("http://speedtest.tele2.net/5MB.zip", 5000);
 
 

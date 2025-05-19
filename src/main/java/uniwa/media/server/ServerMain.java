@@ -23,8 +23,6 @@ public class ServerMain {
             while (true) {
                 Socket clientSocket = serverSocket.accept();
                 System.out.println("New client connected: " + clientSocket.getInetAddress());
-                
-                // Handle each client in a separate thread
                 threadPool.execute(new ClientHandler(clientSocket));
             }
         } catch (Exception e) {

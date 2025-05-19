@@ -22,7 +22,6 @@ public class VideoLibraryBuilder {
             return;
         }
 
-        // 1️⃣ Group existing filenames by base title
         Map<String, Set<String>> existing = new HashMap<>();
         for (File f : VIDEO_DIR.listFiles()) {
             String name = f.getName();
@@ -30,12 +29,10 @@ public class VideoLibraryBuilder {
             existing.computeIfAbsent(base, k -> new HashSet<>()).add(name);
         }
 
-        // 2️⃣ For each title, find its highest‐res source, then transcode lower res/formats
         for (var entry : existing.entrySet()) {
             String base = entry.getKey();
             Set<String> names = entry.getValue();
 
-            // a) Determine max resolution height
             int maxHeight = names.stream()
                 .map(n -> {
                    var m = Pattern.compile(".*-(\\d{3,4})p\\..*").matcher(n);
@@ -43,7 +40,6 @@ public class VideoLibraryBuilder {
                 })
                 .max(Integer::compare).orElse(0);
 
-            // b) Find the exact source filename (with "p" and its extension)
             String sourceName = names.stream()
                 .filter(n -> n.matches(Pattern.quote(base) + "-" + maxHeight + "p\\.[^.]+"))
                 .findFirst()
@@ -52,7 +48,6 @@ public class VideoLibraryBuilder {
 
             File sourceFile = new File(VIDEO_DIR, sourceName);
 
-            // c) Transcode missing variants
             for (String res : RESOLUTIONS) {
                 int h = HEIGHT_MAP.get(res);
                 if (h > maxHeight) continue;
@@ -75,9 +70,9 @@ public class VideoLibraryBuilder {
           .addOutput(
               UrlOutput.toPath(target.toPath())
                        .addArguments("-vf", "scale=-2:" + height)
-                       .addArguments("-c:v", "libx264")  // specify codec if needed
-                       .addArguments("-preset", "ultrafast") // optional
-                       .addArguments("-c:a", "copy")  // copy audio as-is
+                       .addArguments("-c:v", "libx264")  
+                       .addArguments("-preset", "ultrafast") 
+                       .addArguments("-c:a", "copy")  
           )
           .execute();
     }

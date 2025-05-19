@@ -38,11 +38,9 @@ public class ClientHandler implements Runnable {
             out.println("HELLO Streaming Server 1.0");
             String inputLine;
             while ((inputLine = in.readLine()) != null) {
-                System.out.println("Received from client: " + inputLine);
-                
-                // Handle commands (to be expanded later)
-                if (inputLine.startsWith("LIST")) {
-                    // Build a JSON or comma-separated list of files from VideoLibraryBuilder
+                System.out.println("Received from client: " + inputLine);            
+
+                if (inputLine.startsWith("LIST")) {    
                     double mbps = 0.0;
                     String format="mp4";
                     String[] parts = inputLine.split(" ");
@@ -104,14 +102,12 @@ public class ClientHandler implements Runnable {
                         cmd.add("-c:a"); cmd.add("aac");  // re-encode audio to AAC
                         cmd.add("-ac");  cmd.add("2");    // stereo audio
                         cmd.add("-b:a"); cmd.add("96k");  // audio bitrate
-                        // Low-latency output
+                         // Low-latency output
                         cmd.add("-fflags");       cmd.add("+nobuffer");
                         cmd.add("-flush_packets");cmd.add("1");
                         cmd.add("-muxdelay");     cmd.add("0.001");
                         cmd.add("-muxpreload");   cmd.add("0.001");
 
-
-                        // Ultrafast & zero-latency tuning (helps even for copy)
                         cmd.add("-preset");  cmd.add("ultrafast");
                         cmd.add("-tune");    cmd.add("zerolatency");
 

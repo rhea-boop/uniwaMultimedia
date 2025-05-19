@@ -53,7 +53,6 @@ public class SecondaryController {
         int    port     = STREAM_PORTS.get(protocol);
         String serverIP = "localhost";
 
-        // Build ffplay command once
         String uri;
         switch (protocol) {
             case "TCP":
@@ -71,15 +70,12 @@ public class SecondaryController {
         // Run in background
         new Thread(() -> {
             try {
-                // 1️⃣ Start ffplay listener first
                 new ProcessBuilder(fullCmd)
                     .inheritIO()
                     .start();
 
-                // 2️⃣ Give it time to bind (adjust if needed)
                 Thread.sleep(500);
 
-                // 3️⃣ Now connect and tell the server to PLAY
                 try (Socket s = new Socket(serverIP, 8080);
                     BufferedReader in = new BufferedReader(new InputStreamReader(s.getInputStream()));
                     PrintWriter out = new PrintWriter(s.getOutputStream(), true)) {
@@ -101,7 +97,7 @@ public class SecondaryController {
         }).start();
     }
 
-    /** Helper method to build the full ffplay command */
+    /** helper method to build the full ffplay command */
     private List<String> buildLowLatencyFfplayCommand(String uri, String title, String protocol) {
         List<String> base = new ArrayList<>(List.of(
             "ffplay", "-window_title", title, "-autoexit",
