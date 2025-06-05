@@ -8,6 +8,9 @@ import java.net.Socket;
 import java.net.URL;
 import java.util.List;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import fr.bmartel.speedtest.SpeedTestSocket;
 import fr.bmartel.speedtest.SpeedTestReport;
 import fr.bmartel.speedtest.inter.ISpeedTestListener;
@@ -18,30 +21,36 @@ import javafx.application.Platform;
 import javafx.fxml.FXML;
 
 public class PrimaryController {
+    private static final Logger logger = LoggerFactory.getLogger(PrimaryController.class);
 
     @FXML private ChoiceBox<String> formatChoice;
     @FXML private ChoiceBox<String> resolutionChoice;
-
     @FXML private Label speedLabel;
-    
-    @FXML
-    private javafx.scene.control.ChoiceBox<String> videoChoice;
-
-    @FXML
-    private Label label;
+    @FXML private javafx.scene.control.ChoiceBox<String> videoChoice;
+    @FXML private Label label;
 
     private double measuredMbps = 0.0;
+    private SpeedTestSocket speedTestSocket = new SpeedTestSocket();
     
     @FXML
     private void switchToSecondary() throws IOException {
         ClientSession.selectedFile = resolutionChoice.getValue();
+        logger.info("Selected file for playback: {}", ClientSession.selectedFile);
         ClientMain.setRoot("secondary");
     }
     
     @FXML
     public void initialize() {
+        logger.debug("Initializing PrimaryController");
         formatChoice.getItems().addAll("mp4", "mkv", "avi");
         formatChoice.setValue("mp4");
+        
+        formatChoice.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal != null && !newVal.equals(oldVal)) {
+                logger.debug("Format changed from {} to {}", oldVal, newVal);
+                fetchResolutions();
+            }
+        });
     }
 
     @FXML
@@ -51,17 +60,19 @@ public class PrimaryController {
             PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
             
             out.println(message);
-            System.out.println("Sent to server: " + message);
+            logger.info("Sent to server: {}", message);
             ClientMain.setRoot("secondary");
             
         } catch (IOException e) {
-            System.err.println("Error sending message: " + e.getMessage());
+            logger.error("Error sending message: {}", e.getMessage());
         }
     }
 
     @FXML
     private void fetchResolutions() {
         String fmt = formatChoice.getValue();
+        logger.debug("Fetching resolutions for format: {}", fmt);
+        
         try (Socket s = new Socket("localhost", 8080);
              BufferedReader in = new BufferedReader(
                  new InputStreamReader(s.getInputStream()));
@@ -69,41 +80,52 @@ public class PrimaryController {
 
             // 1) consume greeting
             in.readLine();
+            
             // 2) send speed+format
-            out.printf("LIST %.2f %s%n", measuredMbps, fmt);
+            String command = String.format("LIST %.2f %s", measuredMbps, fmt);
+            out.println(command);
+            logger.debug("Sent command: {}", command);
+            
             // 3) read server response
             String line = in.readLine();
             if (line != null && line.startsWith("VIDEO_LIST ")) {
                 String payload = line.substring("VIDEO_LIST ".length());
                 List<String> items = List.of(payload.split(","));
+                logger.info("Received {} video options from server", items.size());
+                
                 Platform.runLater(() -> {
                     resolutionChoice.getItems().setAll(items);
                     if (!items.isEmpty()) resolutionChoice.setValue(items.get(0));
                 });
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("Error fetching resolutions", e);
         }
     }
 
     @FXML
     private void measureSpeed() {
-        speedLabel.setText("Speed: measuring…");
+        logger.info("Starting speed measurement...");
+        speedLabel.setText("Measuring...");
 
         try {
-            SpeedTestSocket speedTestSocket = new SpeedTestSocket();
             speedTestSocket.addSpeedTestListener(new ISpeedTestListener() {
                 @Override
                 public void onCompletion(SpeedTestReport report) {
-                    double mbps = report.getTransferRateBit().doubleValue() / 1_000_000.0;
+                    double mbps = report.getTransferRateBit().doubleValue() / (1000 * 1000);
+                    logger.info("Speed test completed: {} Mbps", mbps);
+                    
                     Platform.runLater(() ->
                         speedLabel.setText(String.format("Speed: %.2f Mbps", mbps))
                     );
                     measuredMbps = mbps;
+                    
+                    Platform.runLater(() -> fetchResolutions());
                 }
 
                 @Override
                 public void onError(SpeedTestError speedTestError, String errorMessage) {
+                    logger.error("Speed test error: {}", errorMessage);
                     Platform.runLater(() ->
                         speedLabel.setText("Speed error: " + errorMessage)
                     );
@@ -111,18 +133,15 @@ public class PrimaryController {
 
                 @Override
                 public void onProgress(float percent, SpeedTestReport report) {
-                    // lmao
+                    double mbps = report.getTransferRateBit().doubleValue() / (1000 * 1000);
+                    logger.debug("Speed test progress: {}%, current speed: {} Mbps", percent, mbps);
                 }
             });
 
             speedTestSocket.startFixedDownload("http://speedtest.tele2.net/5MB.zip", 5000);
-
-
         } catch (Exception e) {
+            logger.error("Error during speed measurement", e);
             speedLabel.setText("Speed: error");
-            e.printStackTrace();
         }
     }
-
-   
 }

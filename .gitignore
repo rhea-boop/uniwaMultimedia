@@ -19,3 +19,5 @@ buildNumber.properties
 .vscode/
 
 videos/
+hls/*
+!hls/.gitkeep

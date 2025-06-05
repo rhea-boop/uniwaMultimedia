@@ -7,15 +7,18 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import uniwa.media.server.VideoLibraryBuilder;
 
 public class ClientHandler implements Runnable {
+    private static final Logger logger = LoggerFactory.getLogger(ClientHandler.class);
+    
     private final Socket clientSocket;
     
     public ClientHandler(Socket socket) {
@@ -37,120 +40,72 @@ public class ClientHandler implements Runnable {
             out.println("HELLO Streaming Server 1.0");
             String inputLine;
             while ((inputLine = in.readLine()) != null) {
-                System.out.println("Received from client: " + inputLine);            
+                logger.info("Received from client: {}", inputLine);            
 
                 if (inputLine.startsWith("LIST")) {    
                     double mbps = 0.0;
                     String format="mp4";
                     String[] parts = inputLine.split(" ");
-                    if (parts.length > 2 ) {
-                        mbps = Double.parseDouble(parts[1]);
-                        format = parts[2];
+                    if (parts.length > 1) {
+                        try {
+                            mbps = Double.parseDouble(parts[1]);
+                        } catch (NumberFormatException e) {
+                            logger.warn("Invalid speed value: {}", parts[1]);
+                        }
                     }
-
+                    
                     if (parts.length >= 3) {
                         format = parts[2];
-                        System.out.println("Requested format: " + format);
+                        logger.debug("Requested format: {}", format);
                     }
 
                     Map<String, Double> bitrateThresholds = Map.of(
-                    "240p", 0.4,
-                    "360p", 0.75,
-                    "480p", 1.0,
-                    "720p", 2.5,
-                    "1080p", 4.5
+                        "240p", 0.4,
+                        "360p", 0.75,
+                        "480p", 1.0,
+                        "720p", 2.5,
+                        "1080p", 4.5
                     );
- 
-                    List<File> allFiles = VideoLibraryBuilder.getAllFiles();
-                    List<String> matchingVideos = new ArrayList<>();
                     
-                   Pattern p = Pattern.compile(".*-(\\d+p)\\." + Pattern.quote(format));
-                    for (File f : allFiles) {
-                        String fn = f.getName();
-                        Matcher m = p.matcher(fn);
-                        if (mbps <= 0.0) {
-                            if (m.matches() && mbps >= bitrateThresholds.getOrDefault(m.group(1), 0.4)) {
-                                matchingVideos.add(fn);
+                    final String fmt = format;
+                    final double speed = mbps;
+                    
+                    Pattern resolutionPattern = Pattern.compile(".*-(\\d{3,4}p)\\." + Pattern.quote(fmt) + "$");
+                    
+                    String list = VideoLibraryBuilder.getAllFiles().stream()
+                        .map(File::getName)
+                        .filter(name -> name.endsWith("." + fmt)) // filter by requested format
+                        .filter(name -> {
+                            Matcher matcher = resolutionPattern.matcher(name);
+                            if (matcher.matches()) {
+                                String resolution = matcher.group(1);
+                                // if resolution requested exists and speed is sufficient
+                                return bitrateThresholds.containsKey(resolution) && 
+                                       speed >= bitrateThresholds.get(resolution);
                             }
-                        } else if (m.matches() && mbps >= bitrateThresholds.getOrDefault(m.group(1), Double.MAX_VALUE)) {
-                            matchingVideos.add(fn);
-                        }
-                    }
-
-                    String response = String.join(",", matchingVideos);
-                    System.out.println("Sending video list: " + response);
-                    out.println("VIDEO_LIST " + response);
-
-                } 
-                
-                else if (inputLine.startsWith("PLAY")) {
-                    String[] request = inputLine.split("\\s+");
-                    if (request.length == 3) {
-                        String fileName = request[1];
-                        String protocol = request[2];
-                        Integer port = STREAM_PORTS.get(protocol);
-                        String clientIP = clientSocket.getInetAddress().getHostAddress();
-                        
-                        List<String> cmd = new ArrayList<>();
-                        cmd.add("ffmpeg");
-                        cmd.add("-re");                        // real-time pacing
-                        cmd.add("-i"); cmd.add("videos/" + fileName);
-
-
-                        cmd.add("-c:v"); cmd.add("copy"); // copy video stream
-                        cmd.add("-c:a"); cmd.add("aac");  // re-encode audio to AAC
-                        cmd.add("-ac");  cmd.add("2");    // stereo audio
-                        cmd.add("-b:a"); cmd.add("96k");  // audio bitrate
-                         // Low-latency output
-                        cmd.add("-fflags");       cmd.add("+nobuffer");
-                        cmd.add("-flush_packets");cmd.add("1");
-                        cmd.add("-muxdelay");     cmd.add("0.001");
-                        cmd.add("-muxpreload");   cmd.add("0.001");
-
-                        cmd.add("-preset");  cmd.add("ultrafast");
-                        cmd.add("-tune");    cmd.add("zerolatency");
-
-                        // Choose container/muxer + URL
-                        cmd.add("-f");
-                        switch (protocol) {
-                        case "TCP":
-                            cmd.add("mpegts");
-                            cmd.add("tcp://"  + clientIP + ":" + port);
-                            break;
-                        case "UDP":
-                            cmd.add("mpegts");
-                            cmd.add("udp://"  + clientIP + ":" + port);
-                            break;
-                        default: // RTP/UDP via MPEG-TS
-                            cmd.add("rtp_mpegts");
-                            cmd.add("rtp://"  + clientIP + ":" + port);
-                            break;
-                        }
-
-                        try {
-                            new ProcessBuilder(cmd)
-                            .inheritIO()
-                            .redirectErrorStream(true)
-                            .start();
-                            out.println("OK : Started playing");
-                        } catch (IOException e) { 
-                            out.println("Error starting ffmpeg: " + e.getMessage());
-                        }
-                    }
+                            return false;
+                        })
+                        .collect(Collectors.joining(","));
+                    
+                    logger.info("Sending video list: {}", list);
+                    out.println("VIDEO_LIST " + list);
                 } else if (inputLine.startsWith("QUIT")) {
+                    logger.info("Client requested disconnect");
                     break;
                 } else {
+                    logger.warn("Unknown command: {}", inputLine);
                     out.println("ERROR Unknown command");
                 }
             }
             
         } catch (Exception e) {
-            System.err.println("Client handler error: " + e.getMessage());
+            logger.error("Error handling client connection", e);
         } finally {
             try {
                 clientSocket.close();
-            } catch (Exception e) {
-                System.err.println("Error closing socket: " + e.getMessage());
+                logger.debug("Client socket closed");
+            } catch (IOException e) {
+                logger.error("Error closing client socket", e);
             }
         }
     }

@@ -40,7 +40,11 @@
             <artifactId>jspeedtest</artifactId>
             <version>1.32.1</version>
         </dependency>
-        
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-web</artifactId>
+            <version>24</version> <!-- Use your JavaFX version here -->
+        </dependency>
     </dependencies>
     <build>
         <plugins>

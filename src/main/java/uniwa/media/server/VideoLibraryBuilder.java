@@ -4,49 +4,41 @@ import com.github.kokorin.jaffree.ffmpeg.FFmpegResult;
 import com.github.kokorin.jaffree.ffmpeg.UrlOutput;
 
 import java.io.File;
-import java.util.*;
-import java.util.regex.Pattern;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class VideoLibraryBuilder {
+    private static final Logger logger = LoggerFactory.getLogger(VideoLibraryBuilder.class);
+    
     private static final File VIDEO_DIR = new File("videos");
-    private static final String[] FORMATS = {"mp4", "mkv", "avi"};
-    private static final String[] RESOLUTIONS = {"240p", "360p", "480p", "720p", "1080p"};
+    private static final List<String> RESOLUTIONS = List.of("240p", "360p", "480p", "720p", "1080p");
+    private static final List<String> FORMATS = List.of("mp4", "mkv", "avi");
     private static final Map<String, Integer> HEIGHT_MAP = Map.of(
-        "240p", 240, "360p", 360, "480p", 480, "720p", 720, "1080p", 1080
+        "240p", 240,
+        "360p", 360,
+        "480p", 480,
+        "720p", 720,
+        "1080p", 1080
     );
 
-     public static void buildLibrary() {
-        if (!VIDEO_DIR.exists() || VIDEO_DIR.listFiles() == null) {
-            System.err.println("videos/ folder missing or unreadable at " +
-                VIDEO_DIR.getAbsolutePath());
-            return;
+    public static void buildLibrary() {
+        if (!VIDEO_DIR.exists()) {
+            VIDEO_DIR.mkdirs();
+            logger.info("Created videos directory at {}", VIDEO_DIR.getAbsolutePath());
         }
-
-        Map<String, Set<String>> existing = new HashMap<>();
-        for (File f : VIDEO_DIR.listFiles()) {
-            String name = f.getName();
-            String base = name.replaceAll("-.*", "");
-            existing.computeIfAbsent(base, k -> new HashSet<>()).add(name);
-        }
-
+        Map<String, File> existing = Collections.emptyMap();
+        logger.info("Found {} source videos", existing.size());
+        
         for (var entry : existing.entrySet()) {
             String base = entry.getKey();
-            Set<String> names = entry.getValue();
-
-            int maxHeight = names.stream()
-                .map(n -> {
-                   var m = Pattern.compile(".*-(\\d{3,4})p\\..*").matcher(n);
-                   return m.matches() ? Integer.parseInt(m.group(1)) : 0;
-                })
-                .max(Integer::compare).orElse(0);
-
-            String sourceName = names.stream()
-                .filter(n -> n.matches(Pattern.quote(base) + "-" + maxHeight + "p\\.[^.]+"))
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException(
-                    "No source file for " + base + " at " + maxHeight + "p"));
-
-            File sourceFile = new File(VIDEO_DIR, sourceName);
+            File sourceFile = entry.getValue();
+            
+            int maxHeight = extractHeight(sourceFile.getName());
+            logger.debug("Processing {} with max height {}", base, maxHeight);
 
             for (String res : RESOLUTIONS) {
                 int h = HEIGHT_MAP.get(res);
@@ -56,7 +48,7 @@ public class VideoLibraryBuilder {
                     String targetName = base + "-" + res + "." + fmt;
                     File targetFile = new File(VIDEO_DIR, targetName);
                     if (!targetFile.exists()) {
-                        System.out.println("Creating: " + targetName);
+                        logger.info("Creating: {}", targetName);
                         transcode(sourceFile, targetFile, h);
                     }
                 }
@@ -64,23 +56,37 @@ public class VideoLibraryBuilder {
         }
     }
 
+    private static int extractHeight(String filename) {
+        try {
+            String heightPart = filename.replaceAll(".*-(\\d+)p\\.[^.]+$", "$1");
+            return Integer.parseInt(heightPart);
+        } catch (Exception e) {
+            logger.warn("Could not extract height from filename: {}", filename);
+            return 1080; 
+        }
+    }
+
     private static void transcode(File source, File target, int height) {
-        FFmpeg.atPath()
-          .addInput(com.github.kokorin.jaffree.ffmpeg.UrlInput.fromPath(source.toPath()))
-          .addOutput(
-              UrlOutput.toPath(target.toPath())
-                       .addArguments("-vf", "scale=-2:" + height)
-                       .addArguments("-c:v", "libx264")  
-                       .addArguments("-preset", "ultrafast") 
-                       .addArguments("-c:a", "copy")  
-          )
-          .execute();
+        try {
+            FFmpeg.atPath()
+              .addInput(com.github.kokorin.jaffree.ffmpeg.UrlInput.fromPath(source.toPath()))
+              .addOutput(
+                  UrlOutput.toPath(target.toPath())
+                           .addArguments("-vf", "scale=-2:" + height)
+                           .addArguments("-c:v", "libx264")  
+                           .addArguments("-preset", "ultrafast") 
+                           .addArguments("-c:a", "copy")  
+              )
+              .execute();
+            logger.info("Successfully transcoded {} to height {}", target.getName(), height);
+        } catch (Exception e) {
+            logger.error("Transcoding failed for {}", target.getName(), e);
+        }
     }
 
     public static List<File> getAllFiles() {
         if (!VIDEO_DIR.exists() || VIDEO_DIR.listFiles() == null) {
-            System.err.println("videos/ folder missing or unreadable at " + 
-                VIDEO_DIR.getAbsolutePath());
+            logger.error("videos/ folder missing or unreadable at {}", VIDEO_DIR.getAbsolutePath());
             return Collections.emptyList();
         }
         
@@ -94,6 +100,7 @@ public class VideoLibraryBuilder {
             }
         }
         
+        logger.debug("Found {} files in video directory", result.size());
         return result;
     }
 }
