@@ -54,21 +54,6 @@ public class PrimaryController {
     }
 
     @FXML
-    private void sendLabelContent() {
-        try (Socket socket = new Socket("localhost", 8080)) {
-            String message = label.getText();
-            PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
-            
-            out.println(message);
-            logger.info("Sent to server: {}", message);
-            ClientMain.setRoot("secondary");
-            
-        } catch (IOException e) {
-            logger.error("Error sending message: {}", e.getMessage());
-        }
-    }
-
-    @FXML
     private void fetchResolutions() {
         String fmt = formatChoice.getValue();
         logger.debug("Fetching resolutions for format: {}", fmt);
@@ -82,7 +67,7 @@ public class PrimaryController {
             in.readLine();
             
             // 2) send speed+format
-            String command = String.format("LIST %.2f %s", measuredMbps, fmt);
+            String command = String.format("LIST %.2f %s", measuredMbps, fmt).replace(',', '.');;
             out.println(command);
             logger.debug("Sent command: {}", command);
             
