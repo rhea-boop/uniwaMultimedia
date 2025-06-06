@@ -7,26 +7,15 @@
 
 <VBox alignment="CENTER" spacing="20.0" xmlns="http://javafx.com/javafx/8.0.171" xmlns:fx="http://javafx.com/fxml/1" fx:controller="uniwa.media.client.PrimaryController">
    <children>
-      <Label fx:id="label" text="learn to sit back and observe" />
-      <Button fx:id="primaryButton" text="pee" onAction="#sendLabelContent"/>
-        <!-- 1. Speed test -->
-  <Label fx:id="speedLabel" text="Speed: (unknown)"/>
-  <Button text="Measure Speed" onAction="#measureSpeed"/>
-
-  <!-- 2. Format selection -->
-  <Label text="Select format:"/>
-  <ChoiceBox fx:id="formatChoice"/>
-
-  <!-- 3. Fetch resolutions -->
-  <Button text="Get Videos"
-          onAction="#fetchResolutions"/>
-
-  <!-- 4. Resolution selection -->
-  <Label text="Choose available video:"/>
-  <ChoiceBox fx:id="resolutionChoice"/>
-
-  <!-- Proceed -->
-  <Button text="Next → Protocol" onAction="#switchToSecondary"/>
+   
+      <Label fx:id="speedLabel" text="Speed: (unknown)"/>
+      <Button text="Measure Speed" onAction="#measureSpeed"/>
+      <Label text="Select format:"/>
+      <ChoiceBox fx:id="formatChoice"/>
+      <Button text="Get Videos" onAction="#fetchResolutions"/>
+      <Label text="Choose available video:"/>
+      <ChoiceBox fx:id="resolutionChoice"/>
+      <Button text="Next → Protocol" onAction="#switchToSecondary"/>
    </children>
    <padding>
       <Insets bottom="20.0" left="20.0" right="20.0" top="20.0" />

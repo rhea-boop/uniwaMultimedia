@@ -45,21 +45,6 @@ public class PrimaryController {
     }
 
     @FXML
-    private void sendLabelContent() {
-        try (Socket socket = new Socket("localhost", 8080)) {
-            String message = label.getText();
-            PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
-            
-            out.println(message);
-            System.out.println("Sent to server: " + message);
-            ClientMain.setRoot("secondary");
-            
-        } catch (IOException e) {
-            System.err.println("Error sending message: " + e.getMessage());
-        }
-    }
-
-    @FXML
     private void fetchResolutions() {
         String fmt = formatChoice.getValue();
         try (Socket s = new Socket("localhost", 8080);
