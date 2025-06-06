@@ -33,7 +33,6 @@ public class ClientHandler implements Runnable {
         try (BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
              PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true)) {
             
-            // Protocol handling
             out.println("HELLO Streaming Server 1.0");
             String inputLine;
             while ((inputLine = in.readLine()) != null) {
@@ -93,15 +92,15 @@ public class ClientHandler implements Runnable {
                         
                         List<String> cmd = new ArrayList<>();
                         cmd.add("ffmpeg");
-                        cmd.add("-re");                        // real-time pacing
+                        cmd.add("-re");                      
                         cmd.add("-i"); cmd.add("videos/" + fileName);
 
 
-                        cmd.add("-c:v"); cmd.add("copy"); // copy video stream
-                        cmd.add("-c:a"); cmd.add("aac");  // re-encode audio to AAC
-                        cmd.add("-ac");  cmd.add("2");    // stereo audio
-                        cmd.add("-b:a"); cmd.add("96k");  // audio bitrate
-                         // Low-latency output
+                        cmd.add("-c:v"); cmd.add("copy"); 
+                        cmd.add("-c:a"); cmd.add("aac");  
+                        cmd.add("-ac");  cmd.add("2");    
+                        cmd.add("-b:a"); cmd.add("96k");  
+                
                         cmd.add("-fflags");       cmd.add("+nobuffer");
                         cmd.add("-flush_packets");cmd.add("1");
                         cmd.add("-muxdelay");     cmd.add("0.001");
@@ -110,7 +109,7 @@ public class ClientHandler implements Runnable {
                         cmd.add("-preset");  cmd.add("ultrafast");
                         cmd.add("-tune");    cmd.add("zerolatency");
 
-                        // Choose container/muxer + URL
+  
                         cmd.add("-f");
                         switch (protocol) {
                         case "TCP":
@@ -121,7 +120,7 @@ public class ClientHandler implements Runnable {
                             cmd.add("mpegts");
                             cmd.add("udp://"  + clientIP + ":" + port);
                             break;
-                        default: // RTP/UDP via MPEG-TS
+                        default: 
                             cmd.add("rtp_mpegts");
                             cmd.add("rtp://"  + clientIP + ":" + port);
                             break;

@@ -30,13 +30,10 @@ public class SecondaryController {
     
     @FXML
     public void initialize() {
-        // Display chosen file
         fileLabel.setText(ClientSession.selectedFile);
 
-        // Populate protocols
         protocolChoice.getItems().setAll(PROTOCOLS);
 
-        // Auto-select default based on resolution
         String res = ClientSession.selectedFile.replaceAll(".*-(\\d+)p\\..*", "$1");
         int prt = Integer.parseInt(res);
         String def;
@@ -61,13 +58,12 @@ public class SecondaryController {
             case "UDP":
                 uri = "udp://0.0.0.0:" + port + "?listen";
                 break;
-            default: // RTP/UDP
+            default: 
                 uri = "rtp://0.0.0.0:" + port + "?listen";
                 break;
         }
         List<String> fullCmd = buildLowLatencyFfplayCommand(uri, file, protocol);
 
-        // Run in background
         new Thread(() -> {
             try {
                 new ProcessBuilder(fullCmd)
@@ -80,7 +76,7 @@ public class SecondaryController {
                     BufferedReader in = new BufferedReader(new InputStreamReader(s.getInputStream()));
                     PrintWriter out = new PrintWriter(s.getOutputStream(), true)) {
 
-                    in.readLine();  // consume greeting
+                    in.readLine();  
                     out.printf("PLAY %s %s%n", file, protocol);
                     String response = in.readLine();
                     if (!response.startsWith("OK")) {
@@ -97,7 +93,6 @@ public class SecondaryController {
         }).start();
     }
 
-    /** helper method to build the full ffplay command */
     private List<String> buildLowLatencyFfplayCommand(String uri, String title, String protocol) {
         List<String> base = new ArrayList<>(List.of(
             "ffplay", "-window_title", title, "-autoexit",
