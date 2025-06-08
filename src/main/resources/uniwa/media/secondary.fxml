@@ -8,8 +8,6 @@
 
 <VBox alignment="CENTER" spacing="20.0" xmlns="http://javafx.com/javafx/8.0.171" xmlns:fx="http://javafx.com/fxml/1" fx:controller="uniwa.media.client.SecondaryController">
     <children>
-        <Label fx:id="label" text="not everything needs a reaction" />
-        <Button fx:id="secondaryButton" text="poo" onAction="#goBack"/>
         <Label text="Streaming:"/>
         <Label fx:id="fileLabel" style="-fx-font-weight: bold;"/>
         <Label text="Select transport protocol:"/>
