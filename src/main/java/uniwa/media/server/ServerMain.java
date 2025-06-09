@@ -6,6 +6,10 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.slf4j.Logger;
@@ -29,26 +33,56 @@ public class ServerMain {
             VideoLibraryBuilder.buildLibrary();
             logger.info("Video library ready.");
             
-            File videoDir = new File("videos");
-            if (videoDir.exists() && videoDir.isDirectory() && videoDir.listFiles() != null) {
-                for (File f : videoDir.listFiles()) {
-                    // e.g. Forrest_Gump-720p.mp4 → base "Forrest_Gump"
-                    String base = f.getName().replaceAll("-\\d+p\\..*", "");
+            // Process HLS content, skipping already generated content
+            logger.info("Processing HLS content...");
+            processHLSContent(new File("videos"));
+            logger.info("HLS content processing complete");
+            
+            startHttpServer();
+            startSocketServer();
+            
+        } catch (Exception e) {
+            logger.error("Server initialization failed", e);
+        }
+    }
+    
+    private static void processHLSContent(File videoDir) {
+        if (videoDir.exists() && videoDir.isDirectory() && videoDir.listFiles() != null) {
+            Map<String, List<File>> filesByBase = new HashMap<>();
+            
+            for (File f : videoDir.listFiles()) {
+                if (!isVideoFile(f.getName())) continue;
+                String base = f.getName().replaceAll("-\\d+p\\..*", "");     
+                filesByBase.computeIfAbsent(base, k -> new ArrayList<>()).add(f);
+            }
+            
+            logger.info("Found {} unique video titles", filesByBase.size());
+            
+            for (String base : filesByBase.keySet()) {
+                File masterPlaylist = new File("hls/" + base + "/master.m3u8");
+                
+                if (masterPlaylist.exists()) {
+                    logger.info("HLS content already exists for {}, skipping", base);
+                } else {
                     try {
+                        logger.info("Generating HLS content for {}", base);
                         HLSBuilder.buildHLSForMovie(base);
                     } catch (Exception e) {
                         logger.error("HLS generation failed for {}: {}", base, e.getMessage());
                     }
                 }
             }
-            
-            startHttpServer();
-            
-            startSocketServer();
-            
-        } catch (Exception e) {
-            logger.error("Server initialization failed", e);
+        } else {
+            logger.warn("Videos directory not found or empty");
         }
+    }
+    
+    private static boolean isVideoFile(String filename) {
+        String lowerName = filename.toLowerCase();
+        return lowerName.endsWith(".mp4") || 
+               lowerName.endsWith(".mkv") || 
+               lowerName.endsWith(".avi") ||
+               lowerName.endsWith(".mov");
     }
     
     private static void startHttpServer() throws IOException {
